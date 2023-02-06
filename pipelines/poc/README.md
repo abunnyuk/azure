@@ -146,7 +146,7 @@ Additional objects/items can be added to the JSON as needed for use in your feat
             --repository $repoName `
             --repository-type tfsgit `
             --branch $branchName `
-            --yaml-path azure-pipelines/pipeline-poc.yml `
+            --yaml-path pipelines/poc/azure-pipelines/pipeline-poc.yml `
             --folder-path poc `
             --skip-run `
             --query id `
