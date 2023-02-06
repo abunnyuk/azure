@@ -76,22 +76,21 @@ Additional objects/items can be added to the JSON as needed for use in your feat
 1. Log into Azure DevOps from the CLI:
 
     ```powershell
+    #! --allow-no-subscription is critical as this supports authenticating azure-devops commands
     az login --allow-no-subscriptions
     ```
 
-1. If you haven't already, clone this repo:
+1. Copy folder [azure-pipelines](./azure-pipelines/) into your cloned target repo
 
-    ```powershell
-    git clone https://github.com/abunnyuk/azure.git
-    ```
-
-1. Inside where you have cloned this repo, edit `$title`, `$org`, and `$project` variables, then run the following script:
+1. Inside your clonder target repo, edit `$title`, `$org`, and `$project` variables, then run the following script:
 
     ```powershell
     # editable variables
-    $title = "SQL Endpoints"
-    $org = "https://dev.azure.com/your-org"
-    $project = "your-project"
+    $title = "SQL Endpoints"                        # work item title, also used for branch and pipeline names
+    $org = "https://dev.azure.com/your-org"         # Azure DevOps organisation URL
+    $project = "your-project"                       # Azure DevOps project name
+    $folderPath = "poc"                             # Azure DevOps pipelines folder to organise the pipeline into
+    $yamlPath = "azure-pipelines/pipeline-poc.yml"  # relative path of the YAML pipeline inside the repo
 
     # retrieve repo name from git path
     $repoPath = git rev-parse --show-toplevel
@@ -102,7 +101,7 @@ Additional objects/items can be added to the JSON as needed for use in your feat
         # retrieve aad user display name
         $assignee = az ad signed-in-user show --query displayName --output tsv
 
-        # create boards task
+        # create boards work item task
         $taskId = az boards work-item create `
             --title $title `
             --assigned-to $assignee `
@@ -146,8 +145,8 @@ Additional objects/items can be added to the JSON as needed for use in your feat
             --repository $repoName `
             --repository-type tfsgit `
             --branch $branchName `
-            --yaml-path pipelines/poc/azure-pipelines/pipeline-poc.yml `
-            --folder-path poc `
+            --yaml-path $yamlPath `
+            --folder-path $folderPath `
             --skip-run `
             --query id `
             --output tsv
