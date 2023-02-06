@@ -1,0 +1,11 @@
+// JSON is transformed in infrastructure pipeline
+{
+  "env": {
+    "appLong": "",
+    "appShort": "",
+    "createdBy": "",
+    "envLong": "",
+    "envShort": "",
+    "workItemId": ""
+  }
+}

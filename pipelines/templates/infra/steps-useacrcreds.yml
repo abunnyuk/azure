@@ -1,0 +1,11 @@
+# File: pipelines/steps-useracrcreds.yml
+
+steps:
+  - task: AzureCLI@2
+    displayName: Use ACR Creds
+    inputs:
+      azureSubscription: ${{ parameters.subscription }}
+      scriptType: pscore
+      scriptLocation: inlineScript
+      inlineScript: |
+        az webapp config set --resource-group ${{ parameters.appGroup }} --name ${{ parameters.appName }} --generic-configurations '{\"acrUseManagedIdentityCreds\": true}'

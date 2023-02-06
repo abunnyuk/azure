@@ -1,0 +1,16 @@
+# File: pipelines/infra/steps-assignrole.yml
+
+steps:
+  - task: AzureCLI@2
+    displayName: Assign ${{ parameters.role }} Role
+    condition: |
+      and(
+        not(failed()),
+        not(canceled())
+      )
+    inputs:
+      arguments: "-memberGroup: '${{ parameters.memberGroup }}' -memberId: '${{ parameters.memberId }}' -memberName: '${{ parameters.memberName }}' -role '${{ parameters.role }}' -targetName '${{ parameters.targetName }}' -targetType '${{ parameters.targetType }}'"
+      azureSubscription: ${{ parameters.subscription }}
+      scriptLocation: "scriptPath"
+      scriptPath: "$(System.DefaultWorkingDirectory)/scripts/assignRole.ps1"
+      scriptType: "pscore"

@@ -1,0 +1,37 @@
+# File: pipelines/build/steps-publish_solution.yml
+
+parameters:
+  - name: modifyOutputPath
+    type: boolean
+    default: true
+  - name: publishPattern
+    type: string
+    default: "**/*.sln"
+  - name: webProject
+    type: boolean
+    default: false
+  - name: zipAfterPublish
+    type: boolean
+    default: false
+
+steps:
+  - task: DotNetCoreCLI@2 # publish the application project to the Solution build agent folder
+    displayName: "Publish ${{ parameters.publishPattern }}"
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/master'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['forcePublish'], 'true')
+        )
+      )
+    inputs:
+      command: "publish"
+      projects: ${{ parameters.publishPattern }}
+      arguments: "--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/Solution"
+      publishWebProjects: ${{ parameters.webProject }}
+      zipAfterPublish: ${{ parameters.zipAfterPublish }}
+      modifyOutputPath: ${{ parameters.modifyOutputPath }}

@@ -1,0 +1,90 @@
+# File: azure-pipelines/pipeline-poc.yml
+
+pr: none
+trigger: none
+
+variables:
+  - template: vars/vars-global.yml
+  - name: deploymentName
+    value: $[lower(replace(variables['Build.DefinitionName'], ' ', ''))]
+  - name: pipelineStartTime
+    value: $[format('{0:yyyyMMddHHmmss}', pipeline.startTime)]
+
+pool:
+  vmImage: windows-latest
+
+stages:
+  - stage: Validate
+    condition: succeeded()
+    jobs:
+      - job: Validate
+        steps:
+          - template: steps-transform-params.yml
+
+          - task: AzureCLI@2
+            name: ValidateMain
+            displayName: "Validate Main"
+            inputs:
+              azureSubscription: $(subscription)
+              scriptType: pscore
+              scriptLocation: inlineScript
+              workingDirectory: $(System.DefaultWorkingDirectory)/azure-pipelines/resources/
+              inlineScript: |
+                az deployment sub validate `
+                  --name $(deploymentName)-$(pipelineStartTime) `
+                  --location $(location) `
+                  --template-file main.bicep
+
+          - task: PublishPipelineArtifact@1
+            name: PublishResources
+            displayName: "Publish Resources"
+            inputs:
+              targetPath: "azure-pipelines/resources"
+              artifactName: Resources
+              artifactType: pipeline
+
+  - stage: Deploy
+    dependsOn: Validate
+    jobs:
+      - deployment: Deploy
+        environment: "POC"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  name: DeployMain
+                  displayName: "Deploy Main"
+                  inputs:
+                    azureSubscription: $(subscription)
+                    scriptType: pscore
+                    scriptLocation: inlineScript
+                    workingDirectory: $(Pipeline.Workspace)/Resources/
+                    inlineScript: |
+                      az deployment sub create `
+                        --name $(deploymentName)-$(pipelineStartTime) `
+                        --location $(location) `
+                        --template-file main.bicep
+
+                      if ($?) {
+                        $deployOutput = az deployment sub show `
+                          --name $(deploymentName)-$(pipelineStartTime) `
+                          --query properties.outputs
+                        Write-Host "##vso[task.setvariable variable=deployOutput]$deployOutput"
+                      }
+
+                - task: PowerShell@2
+                  name: ProcessOutputs
+                  displayName: "Process Outputs"
+                  condition: |
+                    and(
+                      not(failed()),
+                      not(canceled())
+                    )
+                  inputs:
+                    targetType: "filePath"
+                    filePath: $(Pipeline.Workspace)/Resources/scripts/bicepOutputs.ps1
+                    pwsh: true
+                    arguments: >
+                      -outputName 'deployOutput'
+                      -outputObject '$(deployOutput)'

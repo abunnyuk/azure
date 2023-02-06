@@ -1,0 +1,21 @@
+# File: azure-pipelines/steps-transform-params.yml
+
+steps:
+  - task: MagicChunks@2
+    name: TransformParams
+    displayName: "Transform Parameters"
+    inputs:
+      sourcePath: "azure-pipelines/resources/params/main.jsonc"
+      fileType: "Json"
+      targetPathType: "specific"
+      targetPath: "azure-pipelines/resources/params/main.jsonc"
+      transformationType: "json"
+      transformations: |
+        {
+          "env/appLong": "$(appLong)",
+          "env/appShort": "$(appShort)",
+          "env/createdBy": "$(createdBy)",
+          "env/envLong": "$(envLong)",
+          "env/envShort": "$(envShort)",
+          "env/workItemId": "$(workItemId)"
+        }

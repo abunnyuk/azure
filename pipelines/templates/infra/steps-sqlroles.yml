@@ -1,0 +1,29 @@
+# File: pipelines/infra/steps-sqlroles.yml
+
+steps:
+  - task: AzurePowerShell@5
+    name: AssignSqlRoles
+    displayName: "Assign SQL Roles"
+    condition: |
+      and(
+        not(eq('${{ parameters.jsonString }}', '')),  
+        not(eq('${{ parameters.jsonString }}', '{}')),
+        eq('${{ parameters.sqlRoles }}', 'true'),
+        not(failed()),
+        not(canceled())
+      )
+    env:
+      CLIENT_SECRET: ${{ parameters.clientSecret }}
+    inputs:
+      azurePowerShellVersion: latestVersion
+      azureSubscription: ${{ parameters.subscription }}
+      pwsh: true
+      ScriptPath: $(System.DefaultWorkingDirectory)/scripts/sqlRoles.ps1
+      workingDirectory: ${{ parameters.workingDir }}
+      ScriptArguments:
+        -appShort '$(appShort)' `
+        -clientId '${{ parameters.clientId }}' `
+        -envShort '$(envShort)' `
+        -jsonString '${{ parameters.jsonString }}' `
+        -sqlUser '${{ parameters.sqlUser }}' `
+        -tenantId '${{ parameters.tenantId }}'

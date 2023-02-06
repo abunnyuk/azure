@@ -1,0 +1,27 @@
+# File: pipelines/steps-acrtask.yml
+
+steps:
+  - task: AzureCLI@2
+    displayName: Create ACR Task
+    condition: |
+      and(
+        not(failed()),
+        not(canceled())
+      )
+    inputs:
+      azureSubscription: ${{ parameters.subscription }}
+      scriptType: pscore
+      scriptLocation: inlineScript
+      inlineScript: |
+        Write-Host @"
+        Task Name:`t${{ parameters.name }}
+        Command:`t${{ parameters.cmd }}
+        Schedule:`t${{ parameters.schedule }}
+        Registry:`t${{ parameters.registry }}
+        "@
+
+        az acr task create --name "${{ parameters.name }}" `
+          --cmd "${{ parameters.cmd }}" `
+          --schedule "${{ parameters.schedule }}" `
+          --registry ${{ parameters.registry }} `
+          --context /dev/null

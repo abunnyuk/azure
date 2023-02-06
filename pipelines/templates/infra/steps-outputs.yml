@@ -1,0 +1,19 @@
+# File: pipelines/infra/steps-outputs.yml
+
+steps:
+  - task: PowerShell@2
+    name: ProcessOutputs
+    displayName: "Process Outputs"
+    condition: |
+      and(
+        not(eq('${{ parameters.outputObject }}', '')),
+        not(failed()),
+        not(canceled())
+      )
+    inputs:
+      targetType: "filePath"
+      filePath: $(System.DefaultWorkingDirectory)/scripts/bicepOutputs.ps1
+      pwsh: true
+      arguments: >
+        -outputName '${{ parameters.outputName }}'
+        -outputObject '${{ parameters.outputObject }}'

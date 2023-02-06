@@ -1,0 +1,53 @@
+# File: pipelines/build/steps-copy.yml
+
+steps:
+  - task: PowerShell@2
+    name: WriteVersion
+    displayName: Write Version
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/master'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['forceCopy'], 'true')
+        )
+      )
+    inputs:
+      targetType: "inline"
+      script: |
+        $solutionPath = "$(Build.ArtifactStagingDirectory)/Solution"
+        $outputFile = "$solutionPath/version.txt"
+
+        If (!(Test-Path -Path $solutionPath -Type Container)) {
+          New-Item -ItemType Directory -Force -Path $solutionPath
+        }
+
+        "$(versionNumber).$(versionCounter)" | Out-File $outputFile
+        Get-Content $outputFile
+
+        If (!(Test-Path -Path $outputFile -Type Leaf)) {
+          Write-Host "File not found!"
+          exit 1
+        }
+
+  - task: CopyFiles@2
+    name: CopyExtra
+    displayName: Copy Extra Files
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/master'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['forceCopy'], 'true')
+        )
+      )
+    inputs:
+      contents: "extra/*"
+      targetFolder: $(Build.ArtifactStagingDirectory)/Solution
+      flattenFolders: true

@@ -1,0 +1,66 @@
+# File: pipelines/build/steps-odpackage.yml
+
+steps:
+  - task: OctopusPack@4
+    name: ODPackage
+    displayName: Octopus Deploy - Package
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        eq(variables['odpackage'], 'true'),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/master'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['forcePackage'], 'true')
+        )
+      )
+    inputs:
+      PackageId: $(appImage)
+      PackageFormat: "NuPkg"
+      PackageVersion: "$(versionNumber).$(versionCounter)"
+      SourcePath: "$(Build.ArtifactStagingDirectory)/Solution/s"
+      OutputPath: "$(Build.ArtifactStagingDirectory)/OctopusPack"
+      NuGetTitle: "$(appImage), ADO Build"
+
+  - task: OctopusPush@4
+    name: ODPush
+    displayName: Octopus Deploy - Push
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        eq(variables['odpackage'], 'true'),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/master'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['forcePackage'], 'true')
+        )
+      )
+    inputs:
+      OctoConnectedServiceName: "Octopus Deploy"
+      Package: "$(Build.ArtifactStagingDirectory)/OctopusPack/*.nupkg"
+      Replace: true
+
+  - task: OctopusMetadata@4
+    name: ODMeta
+    displayName: Octopus Deploy - Metadata
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        eq(variables['odpackage'], 'true'),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/master'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['forcePackage'], 'true')
+        )
+      )
+    inputs:
+      OctoConnectedServiceName: "Octopus Deploy"
+      PackageId: $(appImage)
+      PackageVersion: "$(versionNumber).$(versionCounter)"
+      Replace: true

@@ -1,0 +1,72 @@
+# File: pipelines/build/steps-global.yml
+
+parameters:
+  - name: buildConfiguration
+    type: string
+    default: "$(buildConfiguration)"
+  - name: maximumCpuCount
+    type: boolean
+    default: true
+  - name: noCache
+    type: boolean
+    default: true
+  - name: solutionPattern
+    type: string
+    default: "**/*.sln"
+
+steps:
+  - task: UseDotNet@2
+    displayName: "Custom .NET Version"
+    condition: ne(variables['dotNetVersion'], '')
+    inputs:
+      version: $(dotNetVersion)
+
+  - task: DotNetCoreCLI@2
+    name: RestoreSolution
+    displayName: Restore Solution
+    condition: |
+      and(
+        not(failed()),
+        not(canceled())
+      )
+    inputs:
+      command: "restore"
+      projects: "${{ parameters.solutionPattern }}"
+      restoreArguments: "/property:Configuration=${{ parameters.buildConfiguration }}"
+      feedsToUse: "select"
+      vstsFeed: "$(artifactFeed)"
+      noCache: ${{ parameters.noCache }}
+
+  - task: VSBuild@1
+    name: BuildSolution
+    displayName: Build Solution
+    condition: |
+      and(
+        not(failed()),
+        not(canceled())
+      )
+    inputs:
+      solution: "${{ parameters.solutionPattern }}"
+      configuration: "${{ parameters.buildConfiguration }}"
+      maximumCpuCount: ${{ parameters.maximumCpuCount }}
+
+  - task: DotNetCoreCLI@2
+    displayName: Run UnitTests
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        ne(variables['testPattern'], '')
+      )
+    inputs:
+      command: "test"
+      projects: $(testPattern)
+      arguments: '--configuration ${{ parameters.buildConfiguration }} --collect "Code coverage"'
+      testRunTitle: "Unit Tests"
+
+  - template: steps-snyk.yml
+    parameters:
+      allProjects: true
+      connection: "$(snykConnection)"
+      organization: "$(snykOrg)"
+      tags: branch=${{ replace(variables['Build.SourceBranchName'], '.', '-') }},reason=$(Build.Reason)

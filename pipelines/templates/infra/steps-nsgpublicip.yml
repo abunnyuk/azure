@@ -1,0 +1,190 @@
+# File: pipelines/resources/steps-nsgpublicip.yml
+
+# Pipeline template to add or delete an NSG rule that allows access on a specific port/range
+# and to a specific destination from the build agent public IP address
+#
+# When creating a rule, it will find the next available priority assuming a usable range
+# and with a default name of AzureDevOpsAgent which can be overridden
+
+# add templates repo
+# resources:
+#   repositories:
+#     - repository: templates
+#       type: git
+#       name: iris-hr.octopus.templates
+
+# add a rule allowing 443 inbound to VirtualNetwork with default name
+# - template: pipelines/infra/steps-nsgpublicip.yml@templates
+#   parameters:
+#     destPorts: '443'
+#     destPrefix: VirtualNetwork
+#     nsgName: $nsgName
+#     resourceGroup: $resourceGroup
+#     subscription: ${{ variables.subscription }}
+
+# add a rule allowing sql redirect inbound to 10.0.0.0/24 with custom name
+# - template: pipelines/infra/steps-nsgpublicip.yml@templates
+#   parameters:
+#     destPorts: '1443 11000-11999'
+#     destPrefix: 10.0.0.0/24
+#     nsgName: $nsgName
+#     resourceGroup: $resourceGroup
+#     rulename: 'SQLRedirect'
+#     subscription: ${{ variables.subscription }}
+
+# delete rule with custom name
+# - template: pipelines/infra/steps-nsgpublicip.yml@templates
+#   parameters:
+#     mode: 'delete'
+#     nsgName: $nsgName
+#     resourceGroup: $resourceGroup
+#     rulename: 'SQLRedirect'
+#     subscription: ${{ variables.subscription }}
+
+parameters:
+  - name: destPorts # space separated list of destination ports which can include ranges, e.g., '1443 11000-11999'
+    type: string
+    default: "*"
+  - name: destPrefix # destination prefix, e.g. VirtualNetwork or 10.0.0.0/24
+    type: string
+    default: "*"
+  - name: direction
+    type: string
+    default: Inbound
+    values:
+      - Inbound
+      - Outbound
+  - name: mode # add (default) or delete rule
+    type: string
+    default: add
+    values:
+      - add
+      - delete
+  - name: nsgName
+    type: string
+  - name: priorityEnd # end usable priority range
+    type: number
+    default: 64999
+  - name: priorityStart # start of usable priority range
+    type: number
+    default: 100
+  - name: protocol
+    type: string
+    default: "*"
+    values:
+      - "*"
+      - Ah
+      - Esp
+      - Icmp
+      - Tcp
+      - Udp
+  - name: resourceGroup
+    type: string
+  - name: ruleName
+    type: string
+    default: AzureDevOpsAgent
+  - name: sleep # how long to wait to give time for the rule to apply
+    type: number
+    default: 30
+  - name: subscription
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    name: NsgPubicIp_${{ parameters.mode }}
+    displayName: "NSG Public IP (${{ parameters.mode }})"
+    ${{ if eq('${{ parameters.mode }}', 'add') }}:
+      condition: |
+        and(
+          not(failed()),
+          not(canceled())
+        )
+    ${{ else }}:
+      condition: always()
+    inputs:
+      azureSubscription: ${{ parameters.subscription }}
+      scriptType: pscore
+      scriptLocation: inlineScript
+      inlineScript: |
+        Write-Host "Mode: ${{ parameters.mode }}"
+        $mode = "${{ parameters.mode }}"
+
+        if ($mode -eq 'add') {
+          try {
+            Write-Host "Retrieving public IP address..."
+
+            $publicIp = Invoke-RestMethod https://ipinfo.io/json | Select-Object -exp ip
+          }
+          catch {
+            Write-Host "Unable to retrieve public IP address!"
+          }
+
+          try {
+            Write-Host "Retrieving sorted list of NSG rule priorities..."
+
+            $ruleIds = az network nsg rule list `
+              --nsg-name ${{ parameters.nsgName }} `
+              --resource-group ${{ parameters.resourceGroup }} `
+              --query '[?direction==`${{ parameters.direction }}`].priority' `
+              --output tsv | Sort-Object
+          }
+          catch {
+            Write-Host "Unable to retrieve rules from NSG!"
+          }
+
+          if ($null -ne $ruleIds) {
+            for ($i = ${{ parameters.priorityStart }}; $i -lt ${{ parameters.priorityEnd }}; $i++) {
+              if ($i -notin $ruleIds)
+              { $priorityNextAvailable = $i; break }
+              else { $priorityNextAvailable = $i + 1 }
+            }
+
+            if ($null -ne $priorityNextAvailable) {
+              Write-Host "Creating ${{ parameters.direction }} rule $priorityNextAvailable called ${{ parameters.ruleName }} on ${{ parameters.nsgName }}..."
+
+              try {
+                  $createRule = az network nsg rule create `
+                    --resource-group ${{ parameters.resourceGroup }} `
+                    --nsg-name ${{ parameters.nsgName }} `
+                    --name ${{ parameters.ruleName }} `
+                    --access Allow `
+                    --description "Allow ${{ parameters.destPorts }} inbound from Azure DevOps build agent. Database release pipeline." `
+                    --destination-address-prefixes ${{ parameters.destPrefix }} `
+                    --destination-port-ranges ${{ parameters.destPorts }} `
+                    --direction ${{ parameters.direction }} `
+                    --priority $priorityNextAvailable `
+                    --protocol ${{ parameters.protocol }} `
+                    --source-address-prefixes $publicIp `
+                    --source-port-ranges *
+              }
+              catch {
+                Write-Host "Unable to create rule!"
+              }
+            }
+            else {
+                throw "Unable to discover next available rule ID."
+            }
+
+            if ($?) {
+                Write-Host "`nAllowing time for rule to apply before proceeding..."
+                Start-Sleep -Second ${{ parameters.sleep }}
+            }
+            else {
+              throw "Unable to create rule!"
+            }
+          }
+          else { throw "No rules found." }
+        }
+
+        if ($mode -eq 'delete') {
+          Write-Host "Deleting rule ${{ parameters.ruleName }} from ${{ parameters.nsgName }}"
+          try {
+            $deleteRule = az network nsg rule delete `
+              --resource-group ${{ parameters.resourceGroup }} `
+              --nsg-name ${{ parameters.nsgName }} `
+              --name ${{ parameters.ruleName }}
+          }
+          catch {
+            "Unable to delete rule!"
+          }
+        }

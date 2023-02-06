@@ -1,0 +1,93 @@
+# File: pipelines/build/steps-snyk.yml
+
+# Example usage:
+#
+# # scan for all projects
+# - template: steps-snyk.yml
+#   parameters:
+#     allProjects: true
+#     organization: "$(snykOrg)" # e.g. HCM.Payroll
+#     tags: branch=replace(variables['Build.SourceBranchName'], '.', '-'),reason=$(Build.Reason)
+#
+# # test specific project
+# - template: steps-snyk.yml
+#   parameters:
+#     connection: "$(snykConnection)" # if service connection name is not called Snyk
+#     organization: "$(snykOrg)"
+#     project: "Payroll Project"
+#     tags: branch=replace(variables['Build.SourceBranchName'], '.', '-'),reason=$(Build.Reason)
+#     targetFile: "Payroll.Project/obj/project.assets.json"
+
+parameters:
+  - name: allProjects # scan for all projects
+    type: boolean
+    default: false
+  - name: connection # name of the ADO service connection
+    type: string
+    default: "Snyk"
+  - name: depth # subdirectory depth (for all projects)
+    type: number
+    default: 5
+  - name: dockerFile
+    type: string
+    default: ""
+  - name: dockerImage
+    type: string
+    default: ""
+  - name: monitor # when to sent results to Snyk UI
+    type: string
+    default: "always"
+    values:
+      - "always"
+      - "never"
+      - "noIssuesFound"
+  - name: failOnIssues # fail pipeline if issues found
+    type: boolean
+    default: false
+  - name: organization # name of Snyk organisation
+    type: string
+    default: ""
+  - name: project # custom project name (if not using all projects)
+    type: string
+    default: ""
+  - name: tags # in the format foo=bar,some=thing
+    type: string
+    default: ""
+  - name: targetFile # target manifest file (if not using all projects)
+    type: string
+    default: ""
+  - name: testDirectory # custom root directory
+    type: string
+    default: ""
+  - name: testType # test app or container
+    type: string
+    default: "app"
+    values:
+      - "app"
+      - "container"
+
+steps:
+  - task: SnykSecurityScan@1
+    displayName: "Snyk Scan (${{ parameters.testType }})"
+    condition: |
+      and(
+        not(failed()),
+        not(canceled())
+      )
+    inputs:
+      ${{ if eq(parameters['allProjects'], true) }}:
+        # additionalArguments: "--all-projects --detection-depth=${{ parameters.depth }} --project-tags=${{ parameters.tags }}"
+        additionalArguments: "--all-projects --detection-depth=${{ parameters.depth }}"
+      ${{ if eq(parameters['testType'], 'container') }}:
+        dockerfilePath: "${{ parameters.dockerFile }}"
+        dockerImageName: "${{ parameters.dockerImage }}"
+      failOnIssues: "${{ parameters.failOnIssues }}"
+      monitorWhen: "${{ parameters.monitor }}"
+      organization: "${{ parameters.organization }}"
+      ${{ if not(parameters['allProjects']) }}: # not supported with --all-projects argument
+        # additionalArguments: "--project-tags=${{ parameters.tags }}"
+        projectName: "${{ parameters.project }}"
+        targetFile: "${{ parameters.targetFile }}"
+      serviceConnectionEndpoint: "${{ parameters.connection }}"
+      testDirectory: "${{ parameters.testDirectory }}"
+      testType: "${{ parameters.testType }}"

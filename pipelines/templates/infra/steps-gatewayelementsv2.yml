@@ -1,0 +1,57 @@
+# File: pipelines/infra/steps-sqlroles.yml
+
+steps:
+  - task: AzureCLI@2
+    name: GatewayElements
+    displayName: "Gateway Elements v2"
+    condition: |
+      and(
+        ne(variables['urlPrefix'], ''),
+        eq('${{ parameters.gatewayElements }}', 'true'),
+        not(failed()),
+        not(canceled())
+      )
+    inputs:
+      arguments: "-appHealth: '${{ parameters.appHealthPath }}' -appHostname: '${{ parameters.appHostname }}' -urlPrefix: '${{ parameters.urlPrefix }}' -gatewayGroup: '${{ parameters.gatewayGroup }}' -gatewayName: '${{ parameters.gatewayName }}' -jsonString: '${{ parameters.jsonString }}' -subscription: '${{ parameters.subscription }}'"
+      azureSubscription: ${{ parameters.subscription }}
+      scriptLocation: "scriptPath"
+      scriptPath: "$(System.DefaultWorkingDirectory)/scripts/gatewayElements.ps1"
+      scriptType: "pscore"
+
+  - task: AzureCLI@2
+    name: GatewayCleanup
+    displayName: Gateway Cleanup
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        eq(variables['cleanup'], 'true')
+      )
+    inputs:
+      azureSubscription: ${{ parameters.subscription }}
+      scriptType: pscore
+      scriptLocation: inlineScript
+      inlineScript: |
+        az network application-gateway rule delete `
+          --resource-group ${{ parameters.gatewayGroup }} `
+          --gateway-name ${{ parameters.gatewayName }} `
+          --name ruleDefault `
+          --no-wait
+
+        az network application-gateway address-pool delete `
+          --resource-group ${{ parameters.gatewayGroup }} `
+          --gateway-name ${{ parameters.gatewayName }} `
+          --name backendAddressPoolDefault `
+          --no-wait
+
+        az network application-gateway http-listener delete `
+          --resource-group ${{ parameters.gatewayGroup }} `
+          --gateway-name ${{ parameters.gatewayName }} `
+          --name httpListenerDefault `
+          --no-wait
+
+        az network application-gateway http-settings delete `
+          --resource-group ${{ parameters.gatewayGroup }} `
+          --gateway-name ${{ parameters.gatewayName }} `
+          --name backendHttpSettingDefault `
+          --no-wait

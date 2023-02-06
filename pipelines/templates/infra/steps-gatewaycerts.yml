@@ -1,0 +1,86 @@
+# File: pipelines/infra/steps-sqlroles.yml
+
+steps:
+  - task: AzureCLI@2
+    name: AddCert_${{ parameters.gateway }}_${{ parameters.name }}
+    displayName: "Add ${{ parameters.cn }} to ${{ parameters.gateway }}"
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        eq('${{ parameters.condition }}', 'True')
+      )
+    inputs:
+      azureSubscription: ${{ parameters.subscription }}
+      scriptType: pscore
+      scriptLocation: inlineScript
+      workingDirectory: $(Pipeline.Workspace)/Resources/
+      inlineScript: |
+        $resourceString = "${{ parameters.gateway }}"
+        $resourceGroup = "rg-$(appShort)-$resourceString-$(envShort)"
+        $agwName = "agw-$(appShort)-${{ parameters.gateway }}-$(envShort)"
+        $authCertFile = "${{ parameters.name }}.cer"
+        $authCertName = "authcert-${{ parameters.name }}"
+        $sslCertName = "cert-${{ parameters.name }}"
+
+        Write-Host "Processing ${{ parameters.path }} for cert ${{ parameters.cn }} on $agwName in $resourceGroup"
+
+        $sslCerts = az network application-gateway ssl-cert list --resource-group $resourceGroup --gateway-name $agwName --query "[].name" --output tsv
+
+        if ($sslCerts -And $sslCerts.Contains($sslCertName)) {
+          Write-Host "Updating SSL certificate $sslCertName..."
+
+          az network application-gateway ssl-cert update `
+            --resource-group $resourceGroup  `
+            --gateway-name $agwName `
+            --name $sslCertName `
+            --cert-file ${{ parameters.path }} `
+            --cert-password ${{ parameters.secret }}
+        }
+        else
+        {
+          Write-Host "Creating SSL certificate $sslCertName which can take up to 15 minutes..."
+          
+          az network application-gateway ssl-cert create `
+            --resource-group $resourceGroup  `
+            --gateway-name $agwName `
+            --name $sslCertName `
+            --cert-file ${{ parameters.path }} `
+            --cert-password ${{ parameters.secret }}
+        }
+
+        if ($resourceString -eq 'gwhr') {
+          $authCerts = az network application-gateway auth-cert list --resource-group $resourceGroup --gateway-name $agwName --query "[].name" --output tsv
+          openssl pkcs12 -in ${{ parameters.path }} -passin pass:${{ parameters.secret }} -nokeys | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > $authCertFile
+
+          if (Test-Path -Path $authCertFile -PathType Leaf) {
+            Get-Content $authCertFile
+
+            if ($authCerts -And $authCerts.Contains($authCertName)) {
+              Write-Host "Updating authentication certificate $authCertName..."
+
+              az network application-gateway auth-cert update `
+                --resource-group $resourceGroup `
+                --gateway-name $agwName `
+                --name $authCertName `
+                --cert-file $authCertFile
+            }
+            else {
+              Write-Host "Creating authentication certificate $authCertName which can take up to 15 minutes..."
+
+              az network application-gateway auth-cert create `
+              --resource-group $resourceGroup `
+              --gateway-name $agwName `
+              --name $authCertName `
+              --cert-file $authCertFile
+            }
+
+            Remove-Item -Path $authCertFile -Force
+          }
+          else {
+            Write-Host "Could not find $authCertFile"
+          }
+        }
+        else {
+          Write-Host "Auth certs not required"
+        }

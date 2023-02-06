@@ -1,0 +1,41 @@
+# File: pipelines/build/steps-package.yml
+
+steps:
+  - task: DotNetCoreCLI@2 # create the NuGet package and save in the Solution build agent folder
+    displayName: Create Package
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        ne(variables['packagePattern'], ''),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/master'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['forcePackage'], 'true')
+        )
+      )
+    inputs:
+      command: "pack"
+      packagesToPack: "$(packagePattern)"
+      versioningScheme: "byBuildNumber"
+      outputDir: "$(Build.ArtifactStagingDirectory)/Solution"
+
+  - task: DotNetCoreCLI@2 # push the NuGet package from the published Solution artefact to the ADO feed
+    displayName: Push Package
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        ne(variables['packagePattern'], ''),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/master'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['forcePackage'], 'true')
+        )
+      )
+    inputs:
+      command: "push"
+      searchPatternPush: "$(Build.ArtifactStagingDirectory)/Solution/*.nupkg"
+      feedPublish: "$(artifactFeed)"

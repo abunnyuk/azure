@@ -1,0 +1,20 @@
+# File: pipelines/build/steps-publish_artefact.yml
+
+steps:
+  - task: PublishPipelineArtifact@1 # publish the application components from the build agent folder
+    displayName: Publish Artefact
+    condition: |
+      and(
+        not(failed()),
+        not(canceled()),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/master'),
+          eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+          eq(variables['forcePublish'], 'true')
+        )
+      )
+    inputs:
+      targetPath: $(Build.ArtifactStagingDirectory)/Solution
+      artifactName: Solution
+      artifactType: pipeline

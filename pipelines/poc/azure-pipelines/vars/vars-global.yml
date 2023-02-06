@@ -1,0 +1,9 @@
+# File: azure-pipelines/vars/vars-global.yml
+
+variables:
+  appLong: "DevOps"
+  appShort: "devops"
+  envLong: POC
+  envShort: poc
+  location: uksouth
+  subscription: "My Subscription"
