@@ -1,4 +1,5 @@
 // File: virtualNetwork.bicep
+// Author: Bunny Davies
 // 
 // Change log:
 // - Initial release

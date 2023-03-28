@@ -1,4 +1,5 @@
 // File: appGatewayV2.bicep
+// Author: Bunny Davies
 // Version: 0.1
 // 
 //! MODULE IN DEVELOPMENT - NOT PRODUCTION READY
@@ -7,20 +8,23 @@
 param location_p string = resourceGroup().location
 param resourceTags_p object = {}
 
+@description('Resource ID of the public IP address.')
+param pipId_p string
+
 // gateway params
-@allowed([
-  'Detection'
-  'Prevention'
-])
-param agwFirewallMode string = 'Detection'
+// @allowed([
+//   'Detection'
+//   'Prevention'
+// ])
+// param agwFirewallMode string = 'Detection'
 param agwName_p string = 'agw-${uniqueString(resourceGroup().id)}'
 param agwUserIdentityName_p string = 'id-${agwName_p}'
 
-@allowed([
-  '2.29'
-  '3.0'
-])
-param agwRuleSetVersion string = '3.0'
+// @allowed([
+//   '2.29'
+//   '3.0'
+// ])
+// param agwRuleSetVersion string = '3.0'
 
 @minValue(1)
 @maxValue(32)
@@ -28,7 +32,7 @@ param agwSkuCapacity_p int = 1
 
 @allowed([
   'Standard_v2'
-  'WAF_v2'
+  // 'WAF_v2' // TO DO
 ])
 param agwSkuName_p string = 'Standard_v2'
 param agwSubnetId_p string
@@ -38,33 +42,6 @@ param agwSubnetId_p string
   'UserAssigned'
 ])
 param identity_p string = 'UserAssigned'
-
-// public ip params
-param pipName_p string = 'pip-${uniqueString(resourceGroup().id)}'
-
-@allowed([
-  'Global'
-  'Regional'
-])
-param pipSkuTier_p string = 'Regional'
-
-@allowed([
-  'Basic'
-  'Standard'
-])
-param pipSkuName_p string = 'Basic'
-
-@allowed([
-  'IPv4'
-  'IPv6'
-])
-param pipVersion_p string = 'IPv4'
-
-@allowed([
-  'Dynamic'
-  'Static'
-])
-param pipMethod_p string = 'Dynamic'
 
 var identity_v = {
   None: {
@@ -82,30 +59,13 @@ var identity_v = {
 param eventHubAuthId_p string = ''
 param eventHubName_p string = ''
 
-// resources
-
-// outputs
-resource pip_r 'Microsoft.Network/publicIPAddresses@2021-05-01' = {
-  name: pipName_p
-  location: location_p
-  tags: resourceTags_p
-  sku: {
-    name: pipSkuName_p
-    tier: pipSkuTier_p
-  }
-  properties: {
-    publicIPAddressVersion: pipVersion_p
-    publicIPAllocationMethod: pipMethod_p
-  }
-}
-
-resource identity_r 'Microsoft.ManagedIdentity/userAssignedIdentities@2022-01-31-preview' = if (identity_p == 'UserAssigned') {
+resource identity_r 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = if (identity_p == 'UserAssigned') {
   name: agwUserIdentityName_p
   location: location_p
   tags: resourceTags_p
 }
 
-resource agw_r 'Microsoft.Network/applicationGateways@2021-05-01' = if (endsWith(agwSkuName_p, 'v2')) {
+resource agw_r 'Microsoft.Network/applicationGateways@2022-09-01' = if (endsWith(agwSkuName_p, 'v2')) {
   name: agwName_p
   location: location_p
   tags: resourceTags_p
@@ -113,7 +73,7 @@ resource agw_r 'Microsoft.Network/applicationGateways@2021-05-01' = if (endsWith
   properties: {
     sku: {
       name: agwSkuName_p
-      tier: split(agwSkuName_p, '_')[0]
+      tier: agwSkuName_p
       capacity: agwSkuCapacity_p
     }
     gatewayIPConfigurations: [
@@ -132,7 +92,7 @@ resource agw_r 'Microsoft.Network/applicationGateways@2021-05-01' = if (endsWith
         properties: {
           privateIPAllocationMethod: 'Dynamic'
           publicIPAddress: {
-            id: pip_r.id
+            id: pipId_p
           }
         }
       }
@@ -185,6 +145,7 @@ resource agw_r 'Microsoft.Network/applicationGateways@2021-05-01' = if (endsWith
       {
         name: 'ruleDefault'
         properties: {
+          priority: 1000
           ruleType: 'Basic'
           httpListener: {
             id: resourceId('Microsoft.Network/applicationGateways/httpListeners', agwName_p, 'httpListenerDefault')
@@ -198,12 +159,12 @@ resource agw_r 'Microsoft.Network/applicationGateways@2021-05-01' = if (endsWith
         }
       }
     ]
-    webApplicationFirewallConfiguration: {
-      enabled: ((contains(agwSkuName_p, 'WAF')) ? true : false)
-      firewallMode: agwFirewallMode
-      ruleSetType: 'OWASP'
-      ruleSetVersion: agwRuleSetVersion
-    }
+    // webApplicationFirewallConfiguration: {
+    //   enabled: ((contains(agwSkuName_p, 'WAF')) ? true : false)
+    //   firewallMode: agwFirewallMode
+    //   ruleSetType: 'OWASP'
+    //   ruleSetVersion: agwRuleSetVersion
+    // }
   }
 }
 
@@ -228,33 +189,9 @@ resource agwDiags_r 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' =
   }
 }
 
-resource agwPipDiags_r 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (!empty(eventHubName_p) && !empty(eventHubAuthId_p)) {
-  scope: pip_r
-  name: 'default'
-  properties: {
-    eventHubName: eventHubName_p
-    eventHubAuthorizationRuleId: eventHubAuthId_p
-    logs: [
-      {
-        categoryGroup: 'audit'
-        enabled: true
-      }
-      {
-        categoryGroup: 'allLogs'
-        enabled: true
-      }
-    ]
-    metrics: [
-      {
-        category: 'AllMetrics'
-        enabled: true
-      }
-    ]
-  }
-}
-
 // outputs
 output api string = agw_r.apiVersion
 output id string = agw_r.id
 output name string = agw_r.name
+output principalId string = identity_r.properties.principalId
 output type string = agw_r.type

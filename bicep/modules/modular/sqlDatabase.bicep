@@ -1,4 +1,5 @@
 // File: sqlDatabase.bicep
+// Version: 0.1
 
 // all resource params
 param location_p string = resourceGroup().location

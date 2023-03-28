@@ -1,4 +1,5 @@
 // File: sqlServer.bicep
+// Author: Bunny Davies
 // 
 // Change log:
 // - Initial release

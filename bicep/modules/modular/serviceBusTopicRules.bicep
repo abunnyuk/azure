@@ -1,4 +1,5 @@
 // File: serviceBusQueue.bicep
+// Author: Bunny Davies & Jan Widlinski
 
 // params
 @description('''

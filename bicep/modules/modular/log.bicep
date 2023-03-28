@@ -1,4 +1,6 @@
 // File: log.bicep
+// Author: Bunny Davies
+// Version: 0.1
 
 // global params
 param location_p string = resourceGroup().location

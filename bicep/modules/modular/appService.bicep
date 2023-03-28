@@ -1,4 +1,5 @@
 // File: appService.bicep
+// Author: Bunny Davies
 //
 // Change log:
 // - Initial release

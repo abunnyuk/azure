@@ -1,4 +1,5 @@
 // File: privateEndpoint.bicep
+// Author: Bunny Davies
 //
 // Creates a Private Endpoint and attaches it to a Private DNS Zone
 //

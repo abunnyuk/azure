@@ -1,4 +1,5 @@
 // File: virtualMachine.bicep
+// Author: Bunny Davies
 //
 // !Work in progress!
 // TODO: Add Linux support

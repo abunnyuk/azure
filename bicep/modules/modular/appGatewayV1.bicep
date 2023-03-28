@@ -1,4 +1,5 @@
 // File: appGatewayV1.bicep
+// Author: Bunny Davies
 // Version: 0.1
 
 // global params

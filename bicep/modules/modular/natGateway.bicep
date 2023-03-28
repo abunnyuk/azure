@@ -1,4 +1,5 @@
 // File: natGateway.bicep
+// Author: Bunny Davies
 //
 // Change log:
 // - Initial release

@@ -1,4 +1,5 @@
 // File: serviceBus.bicep
+// Author: Bunny Davies
 // Version: 0.1
 
 // all resource params

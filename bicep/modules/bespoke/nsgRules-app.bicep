@@ -1,4 +1,5 @@
 // File: nsgRules-app.bicep
+// Author: Bunny Davies
 // 0.1 - initial release
 //
 // Custom NSG rules

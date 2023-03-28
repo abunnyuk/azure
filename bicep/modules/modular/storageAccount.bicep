@@ -1,17 +1,18 @@
 // File: storage.bicep
+// Author: Bunny Davies
 // 
 // Change log:
 // - Initial release
 // - Added default address
 // - Added example usage
-// - Removed unnecessary url output
 // - Added endpoint outputs as per https://docs.microsoft.com/en-us/azure/storage/common/storage-account-overview#standard-endpoints
+// - Added option to save connection string as a key vault secret
 // 
 // Creates a Storage Account
 // 
 // module storage_m 'modules/modular/storageAccount.bicep' = {
 //   scope: group_r
-//   name: 'storage_m'
+//   name: 'storage_m'accountName_p
 //   params: {
 //     accountName_p: storageName_v
 //     allowedIpAddresses_p: [
@@ -27,34 +28,19 @@
 //   }
 // }
 
-// global params
+// params - global
+param eventHubAuthId_p string = ''
+param eventHubName_p string = ''
 param location_p string = resourceGroup().location
 param resourceTags_p object = {}
 
-// storage params
-@allowed([
-  'Cool'
-  'Hot'
-])
-@description('Required for storage accounts where kind = BlobStorage. The access tier used for billing.')
-param accessTier_p string = 'Hot'
-
-@description('The resource name')
+// params
 param accountName_p string = 'store${uniqueString(resourceGroup().id)}'
 
 @description('Allow or disallow public access to all blobs or containers in the storage account.')
 param allowBlobPublicAccess bool = false
 
-@description('Sets the IP ACL rules')
 param allowedIpAddresses_p array = []
-
-@description('''
-Indicates whether the storage account permits requests to be authorized with the account access key via Shared Key.
-If false, then all requests, including shared access signatures, must be authorized with Azure Active Directory (Azure AD).
-''')
-param allowSharedKeyAccess_p bool = true
-
-@description('Sets the virtual network rules')
 param allowedSubnets_p array = []
 
 @allowed([
@@ -82,12 +68,11 @@ param defaultAction_p string = 'Deny'
 ])
 param kind_p string = 'StorageV2'
 
-@allowed([
-  'Disabled'
-  'Enabled'
-])
-@description('Network rule set')
-param publicNetworkAccess_p string = 'Disabled'
+@description('''
+Name of the Key Vault secret that will contain the Storage Account connection string
+Default value set to `accountName_p`.
+''')
+param secretName_p string = accountName_p
 
 @allowed([
   'Premium_LRS'
@@ -101,10 +86,10 @@ param publicNetworkAccess_p string = 'Disabled'
 ])
 param skuName_p string = 'Standard_ZRS'
 
-// diags params
-param eventHubAuthId_p string = ''
-param eventHubName_p string = ''
+@description('Name of the Key Vault where the connection string should be stored as a secret')
+param vaultName_p string = ''
 
+// vars
 var allowedIpsArray_v = [for ip in allowedIpAddresses_p: {
   value: ip
   action: 'Allow'
@@ -115,8 +100,10 @@ var allowedSubnetsArray_v = [for subnet in allowedSubnets_p: {
   action: 'Allow'
 }]
 
-// deploy storage account
-resource storageAccount_r 'Microsoft.Storage/storageAccounts@2021-06-01' = {
+var storageConnecstringString_v = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount_r.name};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount_r.listKeys().keys[0].value}'
+
+// resources
+resource storageAccount_r 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   name: accountName_p
   location: location_p
   tags: resourceTags_p
@@ -125,11 +112,8 @@ resource storageAccount_r 'Microsoft.Storage/storageAccounts@2021-06-01' = {
   }
   kind: kind_p
   properties: {
-    accessTier: accessTier_p
     allowBlobPublicAccess: allowBlobPublicAccess
-    allowSharedKeyAccess: allowSharedKeyAccess_p
     minimumTlsVersion: 'TLS1_2'
-    publicNetworkAccess: publicNetworkAccess_p
     networkAcls: {
       defaultAction: defaultAction_p
       bypass: bypass_p
@@ -140,7 +124,6 @@ resource storageAccount_r 'Microsoft.Storage/storageAccounts@2021-06-01' = {
   }
 }
 
-// configure storage account diags
 resource storageAccountDiags_r 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (!empty(eventHubName_p) && !empty(eventHubAuthId_p)) {
   scope: storageAccount_r
   name: 'default'
@@ -153,6 +136,13 @@ resource storageAccountDiags_r 'Microsoft.Insights/diagnosticSettings@2021-05-01
         enabled: true
       }
     ]
+  }
+}
+
+resource secret_r 'Microsoft.KeyVault/vaults/secrets@2022-11-01' = if (!empty(vaultName_p)) {
+  name: '${vaultName_p}/${secretName_p}'
+  properties: {
+    value: storageConnecstringString_v
   }
 }
 

@@ -1,4 +1,5 @@
 // File: networkInterface.bicep
+// Author: Bunny Davies
 //
 // Work in progress!
 

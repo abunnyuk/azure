@@ -1,4 +1,5 @@
 // File: vault.bicep
+// Author: Bunny Davies
 // Version: 0.1
 
 // global params

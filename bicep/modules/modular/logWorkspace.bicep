@@ -1,4 +1,5 @@
 // File: logWorkspace.bicep
+// Author: Bunny Davies
 //
 // Change log:
 // - Initial release

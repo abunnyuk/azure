@@ -1,4 +1,5 @@
 // File: nsg.bicep
+// Author: Bunny Davies
 //
 // Creates a Network Security Group
 //

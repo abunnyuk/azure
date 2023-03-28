@@ -1,4 +1,5 @@
 // File: nsgRules.bicep
+// Author: Bunny Davies
 //
 // Change log:
 // - Initial release

@@ -1,4 +1,5 @@
 // File: serviceBusQueue.bicep
+// Author: Bunny Davies & Jan Widlinski
 
 // params
 // @description('ISO 8061 timeSpan idle interval after which the queue is automatically deleted. The minimum duration is 5 minutes.')

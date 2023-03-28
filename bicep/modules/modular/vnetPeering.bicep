@@ -1,4 +1,5 @@
 // File: vnetPeering.bicep
+// Author: Bunny
 // Version: 0.1
 
 @description('Name of the peering to be created.')

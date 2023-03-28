@@ -1,4 +1,5 @@
 // File: privateDnsZone.bicep
+// Author: Bunny Davies
 //
 // Change log:
 // - Initial release

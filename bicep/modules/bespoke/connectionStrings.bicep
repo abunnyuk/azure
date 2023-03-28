@@ -54,7 +54,7 @@ var conStringParams_v = ';Persist Security Info=False;MultipleActiveResultSets=F
 var conStringsArray_v = [for connection in conStrings_p: {
   name: connection.name
   server: connection.managedInstance == bool('true') ? 'sqlmi-${env_p.appShort}-data-${connection.ServerId}-${env_p.envShort}.${sqlMiPrefix_p}${sqlServerSuffix_v}' : 'sql-${env_p.appShort}-data-${connection.ServerId}-${env_p.envShort}${sqlServerSuffix_v}'
-  database: ';Database=${connection.database}'
+  database: ';Database=${connection.database};Connection Timeout=${connection.timeout}'
   type: connection.type
 }]
 
@@ -68,7 +68,7 @@ var conStringFlatFormatted_v = replace(replace(string(conStringsJsonArray_v), '}
 // then turn into a json object by removing surrounding square brackets
 var conStringJsonObject_v = json(replace(replace(string(conStringFlatFormatted_v), '[', ''), ']', ''))
 
-// build the sql roles task array which is used in a separate pipeline task
+// build the sql roles task array
 // note that the managed instance connection uses the public endpoint
 var sqlRolesArray_v = [for connection in conStrings_p: {
   server: connection.managedInstance == bool('true') ? 'sqlmi-${env_p.appShort}-data-${connection.ServerId}-${env_p.envShort}.public.${sqlMiPrefix_p}' : 'sql-${env_p.appShort}-data-${connection.ServerId}-${env_p.envShort}'
