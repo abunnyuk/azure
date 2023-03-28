@@ -1,40 +1,76 @@
 # File: pipelines/build/steps-snyk.yml
+#
+# Prerequisites
+#
+# - snyk security scan extension installed and configured
+# https://docs.snyk.io/integrations/ci-cd-integrations/azure-pipelines-integration/install-the-snyk-extension-for-your-azure-pipelines
+# - service connection creating in the azure devops project, preferably called "Snyk"
+# - variables for at least the snyk organisation and service connection name (if different to "Snyk")
 
-# Example usage:
+# Examples
 #
-# # scan for all projects
+# scan for all projects
+# will use the default "Snyk" service connection and tag with the branch name
+#
 # - template: steps-snyk.yml
 #   parameters:
-#     allProjects: true
 #     organization: "$(snykOrg)" # e.g. HCM.Payroll
-#     tags: branch=replace(variables['Build.SourceBranchName'], '.', '-'),reason=$(Build.Reason)
 #
-# # test specific project
+# test a specific project
+# use a service connection with a custom name
+# tag with the branch name and the build reason
+#
 # - template: steps-snyk.yml
 #   parameters:
-#     connection: "$(snykConnection)" # if service connection name is not called Snyk
+#     connection: "$(snykConnection)"
 #     organization: "$(snykOrg)"
 #     project: "Payroll Project"
 #     tags: branch=replace(variables['Build.SourceBranchName'], '.', '-'),reason=$(Build.Reason)
 #     targetFile: "Payroll.Project/obj/project.assets.json"
+#
+# scan for all projects
+# will use the default "Snyk" service connection and tag with the branch name
+# will fail if it finds critical issues and only send results to snyk.io if no issues are found
+#
+# - template: steps-snyk.yml
+#   parameters:
+#     organization: "$(snykOrg)"
+#     failOnIssues: true
+#     failOnThreshold: "critical"
+#     monitor: "noIssuesFound"
 
 parameters:
-  - name: allProjects # scan for all projects
-    type: boolean
-    default: false
-  - name: connection # name of the ADO service connection
+  # required - always
+  - name: organization # name of Snyk organisation
+    type: string
+    default: ""
+
+  # required - if service connection is not called "Snyk"
+  - name: connection # name of the azure devops service connection (if different to being named "Snyk")
     type: string
     default: "Snyk"
-  - name: depth # subdirectory depth (for all projects)
+
+  # required - if testing a specific project
+  - name: project # name of specfic project to be tested
+    type: string
+    default: ""
+  - name: targetFile # target manifest file
+    type: string
+    default: ""
+
+  # required - if "testType" is set to "container"
+  - name: dockerFile # path to dockerfile
+    type: string
+    default: ""
+  - name: dockerImage # path to docker image
+    type: string
+    default: ""
+
+  # optional
+  - name: depth # subdirectory depth (when scanning for all projects)
     type: number
     default: 5
-  - name: dockerFile
-    type: string
-    default: ""
-  - name: dockerImage
-    type: string
-    default: ""
-  - name: monitor # when to sent results to Snyk UI
+  - name: monitor # when to send results to snyk
     type: string
     default: "always"
     values:
@@ -44,18 +80,17 @@ parameters:
   - name: failOnIssues # fail pipeline if issues found
     type: boolean
     default: false
-  - name: organization # name of Snyk organisation
+  - name: failOnThreshold # if failOnIssues is true, then what level of issue should it fail on
     type: string
-    default: ""
-  - name: project # custom project name (if not using all projects)
-    type: string
-    default: ""
+    default: "low"
+    values:
+      - "low"
+      - "medium"
+      - "high"
+      - "critical"
   - name: tags # in the format foo=bar,some=thing
     type: string
-    default: ""
-  - name: targetFile # target manifest file (if not using all projects)
-    type: string
-    default: ""
+    default: "branch=replace(variables['Build.SourceBranchName'], '.', '-')" # default tag of the branch name (periods are not supported)
   - name: testDirectory # custom root directory
     type: string
     default: ""
@@ -64,30 +99,31 @@ parameters:
     default: "app"
     values:
       - "app"
-      - "container"
+      - "container" # currently untested due to license restrictions
 
 steps:
   - task: SnykSecurityScan@1
-    displayName: "Snyk Scan (${{ parameters.testType }})"
-    condition: |
+    displayName: "Snyk Scan (${{ parameters.testType }})" # e.g. "Snyk (app)"
+    condition: | # do not run if any if the previous build tasks fail
       and(
         not(failed()),
         not(canceled())
       )
     inputs:
-      ${{ if eq(parameters['allProjects'], true) }}:
-        # additionalArguments: "--all-projects --detection-depth=${{ parameters.depth }} --project-tags=${{ parameters.tags }}"
-        additionalArguments: "--all-projects --detection-depth=${{ parameters.depth }}"
-      ${{ if eq(parameters['testType'], 'container') }}:
+      ${{ if eq(parameters['project'], '') }}: # if no project has been specified, then test all projects
+        additionalArguments: "--all-projects --detection-depth=${{ parameters.depth }} --project-tags=${{ parameters.tags }}"
+      ${{ else }}: # else test a specific project
+        additionalArguments: "--project-tags=${{ parameters.tags }}"
+        projectName: "${{ parameters.project }}"
+        targetFile: "${{ parameters.targetFile }}"
+      ${{ if eq(parameters['testType'], 'container') }}: # currently untested due to license restrictions
         dockerfilePath: "${{ parameters.dockerFile }}"
         dockerImageName: "${{ parameters.dockerImage }}"
       failOnIssues: "${{ parameters.failOnIssues }}"
+      ${{ if eq(parameters['failOnIssues'], 'true') }}:
+        failOnThreshold: "${{ parameters.failOnThreshold }}"
       monitorWhen: "${{ parameters.monitor }}"
       organization: "${{ parameters.organization }}"
-      ${{ if not(parameters['allProjects']) }}: # not supported with --all-projects argument
-        # additionalArguments: "--project-tags=${{ parameters.tags }}"
-        projectName: "${{ parameters.project }}"
-        targetFile: "${{ parameters.targetFile }}"
       serviceConnectionEndpoint: "${{ parameters.connection }}"
       testDirectory: "${{ parameters.testDirectory }}"
       testType: "${{ parameters.testType }}"
